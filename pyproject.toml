@@ -33,7 +33,7 @@ version = "0.1.0"
 description = "Scripts that combine historical emissions data records from several datasets like CEDS and GFED to create complete historical emissions files that are input to the IAM emissions harmonization algorithms in `IAMconsortium/concordia` (regional harmonization and spatial gridding for ESMs) and `iiasa/climate-assessment` (global climate emulator workflow)."
 readme = "README.md"
 
-[tool.pixi.project]
+[tool.pixi.workspace]
 channels = [
     "conda-forge",
 ]

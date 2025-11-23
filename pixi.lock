@@ -4781,7 +4781,7 @@ packages:
 - pypi: ./
   name: emissions-harmonization-historical
   version: 0.1.0
-  sha256: cca5085c598300631f2855e19b29a7221bec162173f5710397b1b0311654a172
+  sha256: e302a28b21c9d072bfe57dae1904a0eaa22c597df8cb295941a66d33ed89f035
   requires_dist:
   - pre-commit==3.3.1
   - ptolemy-iamc @ git+https://github.com/gidden/ptolemy.git@015aa843c340bd57464eb7cfd5f3c8e397201266

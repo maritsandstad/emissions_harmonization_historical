@@ -5,9 +5,9 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.18.1
+#       jupytext_version: 1.17.1
 #   kernelspec:
-#     display_name: Python 3 (ipykernel)
+#     display_name: default
 #     language: python
 #     name: python3
 # ---
@@ -25,9 +25,12 @@ import logging
 import multiprocessing
 import os
 import platform
+import tempfile
 import warnings
 from functools import partial
+from pathlib import Path
 
+import numpy as np
 import openscm_units
 import pandas_indexing as pix
 import pandas_openscm
@@ -36,6 +39,10 @@ from gcages.renaming import SupportedNamingConventions, convert_variable_name
 from gcages.scm_running import run_scms
 from pandas_openscm.index_manipulation import update_index_levels_func
 
+from emissions_harmonization_historical.ciceroscm_utils import (
+    ciceroscm_output_to_dataframe,
+    dataframe_to_ciceroscm_emissions,
+)
 from emissions_harmonization_historical.constants_5000 import (
     HISTORY_HARMONISATION_DB,
     INFILLED_SCENARIOS_DB,
@@ -74,6 +81,7 @@ Q = UR.Quantity
 # %% editable=true slideshow={"slide_type": ""} tags=["parameters"]
 model: str = "AIM"
 scm: str = "MAGICCv7.6.0a3"
+scm: str = "CICEROSCM"  # instead of "MAGICCv7.6.0a3"
 
 # %%
 output_dir_model = SCM_OUT_DIR / model
@@ -243,8 +251,28 @@ if scm in ["MAGICCv7.5.3", "MAGICCv7.6.0a3"]:
     # MAGICC's Fortran namelist reader expects integer years, not floats
     complete_scm.columns = complete_scm.columns.astype(int)
 
-# Check year range after MAGICC preparation
-print(f"Year range in complete_scm: {complete_scm.columns.min()} to {complete_scm.columns.max()}")
+elif scm.startswith("CICERO"):
+    # CICERO-SCM doesn't need the historical data prepended the same way MAGICC does
+    # It can start from any year in the scenario data
+    complete_scm = complete_scenarios.copy()
+
+    # CICERO-SCM will be run directly (not through openscm-runner)
+    # So we don't need climate_models_cfgs in the same format
+    climate_models_cfgs = None
+
+    # DIAGNOSTIC: Print all available emissions variables
+    print("\nAvailable emissions variables in complete_scm:")
+    emissions_vars = sorted([v for v in complete_scm.pix.unique("variable") if v.startswith("Emissions|")])
+    for var in emissions_vars:
+        print(f"  {var}")
+    print(f"\nTotal: {len(emissions_vars)} emissions variables\n")
+
+else:
+    raise NotImplementedError(f"SCM {scm} not supported")
+
+# Check year range after preparation
+if scm.startswith("MAGICC") or scm.startswith("CICERO"):
+    print(f"Year range in complete_scm: {complete_scm.columns.min()} to {complete_scm.columns.max()}")
 
 
 # %%
@@ -253,7 +281,10 @@ print(f"Year range in complete_scm: {complete_scm.columns.min()} to {complete_sc
 # complete_scm
 
 # %%
-climate_models_cfgs["MAGICC7"][0]["out_dynamic_vars"]
+if scm.startswith("MAGICC"):
+    climate_models_cfgs["MAGICC7"][0]["out_dynamic_vars"]
+elif scm.startswith("CICERO"):
+    print(f"CICERO-SCM will output: {len(output_variables)} variables")
 
 # %% [markdown]
 # ### If MAGICC, check how yuck the jump will be
@@ -306,17 +337,21 @@ if scm.startswith("MAGICC"):
 # ## Run SCM
 
 # %%
-complete_openscm_runner = update_index_levels_func(
-    complete_scm,
-    {
-        "variable": partial(
-            convert_variable_name,
-            from_convention=SupportedNamingConventions.CMIP7_SCENARIOMIP,
-            to_convention=SupportedNamingConventions.OPENSCM_RUNNER,
-        )
-    },
-)
-complete_openscm_runner
+if scm.startswith("MAGICC"):
+    complete_openscm_runner = update_index_levels_func(
+        complete_scm,
+        {
+            "variable": partial(
+                convert_variable_name,
+                from_convention=SupportedNamingConventions.CMIP7_SCENARIOMIP,
+                to_convention=SupportedNamingConventions.OPENSCM_RUNNER,
+            )
+        },
+    )
+    complete_openscm_runner
+elif scm.startswith("CICERO"):
+    # CICERO-SCM will use CMIP7 ScenarioMIP names directly (converted in ciceroscm_utils)
+    print(f"CICERO-SCM will process {len(complete_scm)} rows")
 
 
 # %%
@@ -350,21 +385,123 @@ db = db_hack(SCM_OUTPUT_DB)
 max_processes = min(multiprocessing.cpu_count(), 32)  # Cap at 32 processes
 print(f"Running with {max_processes} parallel processes (system has {multiprocessing.cpu_count()} cores)")
 
-# if scm in ["FAIRv2.2.2"]:
-#    some custom code
-# else:
-run_scms(
-    scenarios=complete_openscm_runner,
-    climate_models_cfgs=climate_models_cfgs,
-    output_variables=output_variables,
-    scenario_group_levels=["model", "scenario"],
-    n_processes=max_processes,
-    db=db,
-    verbose=True,
-    progress=True,
-    batch_size_scenarios=15,
-    force_rerun=True,  # CHANGED: Must re-run for extended scenarios to 2500
-)
+# %%
+# Run the climate model
+if scm.startswith("MAGICC"):
+    # Use openscm-runner for MAGICC
+    run_scms(
+        scenarios=complete_openscm_runner,
+        climate_models_cfgs=climate_models_cfgs,
+        output_variables=output_variables,
+        scenario_group_levels=["model", "scenario"],
+        n_processes=max_processes,
+        db=db,
+        verbose=True,
+        progress=True,
+        batch_size_scenarios=15,
+        force_rerun=True,  # CHANGED: Must re-run for extended scenarios to 2500
+    )
+
+elif scm.startswith("CICERO"):
+    # Run CICERO-SCM directly
+    import shutil
+    import tempfile
+    from pathlib import Path
+
+    from ciceroscm import CICEROSCM
+
+    print(f"Running CICERO-SCM for {len(complete_scm.pix.unique('scenario'))} scenarios")
+
+    # Create temporary directory for emissions files
+    temp_dir = Path(tempfile.mkdtemp(prefix="ciceroscm_"))
+
+    # Get paths to CICERO-SCM test data for gas parameters and defaults
+    ciceroscm_test_dir = REPO_ROOT / "ciceroscm" / "tests" / "test-data"
+
+    try:
+        # Process each scenario
+        for scenario in complete_scm.pix.unique("scenario"):
+            scenario_data = complete_scm.loc[complete_scm.index.get_level_values("scenario") == scenario]
+            model_name = scenario_data.pix.unique("model")[0]
+
+            print(f"Processing {model_name} - {scenario}")
+
+            # Convert to CICERO-SCM format
+            # Pad from 1700 (nystart) even though emissions start at 1750 (emstart)
+            # This allows concentration-driven spinup period 1700-1749
+            emissions_file = temp_dir / f"{model_name}_{scenario.replace(' ', '_')}.txt"
+            cscm_df, metadata = dataframe_to_ciceroscm_emissions(
+                scenario_data,
+                output_file=emissions_file,
+                start_year=1700,  # Pad with zeros from 1700 for concentration spinup
+            )
+            print(f"  Converted {metadata['n_components']} emission components")
+            print(f"  Components: {metadata['components']}")
+
+            # Get year range from metadata
+            start_year, end_year = metadata["year_range"]
+
+            # CICERO-SCM needs concentrations for the initial period before emissions start
+            # The test concentration file starts at 1700, so we'll use it for the early period
+            # and switch to emissions at 1750 (where our data begins)
+
+            # Prepare land use change forcing data padded to match year range
+            # Default file (IPCC_LUCalbedo.txt) runs 1750-2500, but we need 1700-2500
+            import pandas as pd
+
+            luc_forcing_file = ciceroscm_test_dir / "IPCC_LUCalbedo.txt"
+            luc_data = np.loadtxt(luc_forcing_file)
+            # Pad with 50 zeros for years 1700-1749
+            luc_data_padded = np.concatenate([np.zeros(50), luc_data])
+            # Convert to DataFrame (CICERO expects DataFrame with .iloc)
+            luc_data_df = pd.DataFrame(luc_data_padded)
+
+            # Initialize CICERO-SCM
+            # Note: concentrations_file needed for initial period (nystart to emstart)
+            # Following test pattern: nystart < emstart to allow concentration-driven spinup
+            # Test concentration file starts at 1700, our emissions at 1750
+            # Using v1RCMIP gas parameters (simpler set matching our emissions data)
+            cscm = CICEROSCM(
+                {
+                    "gaspam_file": str(ciceroscm_test_dir / "gases_v1RCMIP.txt"),
+                    "emissions_file": str(emissions_file),
+                    "concentrations_file": str(ciceroscm_test_dir / "ssp245_conc_RCMIP.txt"),
+                    "rf_luc_data": luc_data_df,  # Pass padded land use forcing as DataFrame
+                    "nystart": 1700,  # Start earlier to use concentration data for spinup
+                    "emstart": 1750,  # Switch to emissions where our data begins
+                    "nyend": int(end_year),
+                }
+            )
+
+            # Run CICERO-SCM using _run (not run_model) with results_as_dict
+            cscm._run(
+                {
+                    "results_as_dict": True,
+                    "carbon_cycle_outputs": True,
+                }
+            )
+
+            print(f"  CICERO-SCM run completed, processing {len(cscm.results)} output variables")
+
+            # Convert output to DataFrame format
+            output_df = ciceroscm_output_to_dataframe(
+                cscm_results=cscm.results,
+                scenario_name=scenario,
+                model_name=model_name,
+                climate_model=scm,
+                output_variables=output_variables,
+            )
+
+            # Save to database
+            db.save(output_df)
+            print(f"  Saved {len(output_df.pix.unique('variable'))} variables to database")
+
+    finally:
+        # Clean up temporary directory
+        shutil.rmtree(temp_dir, ignore_errors=True)
+
+else:
+    raise NotImplementedError(f"SCM {scm} not supported")
 
 # %%
 # Check what was actually saved by run_scms to the database
