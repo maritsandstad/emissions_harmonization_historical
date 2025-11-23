@@ -5,7 +5,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.11.2
+#       jupytext_version: 1.18.1
 #   kernelspec:
 #     display_name: default
 #     language: python
@@ -56,7 +56,7 @@ pd.set_option("display.max_rows", 100)
 
 # %%
 categories = POST_PROCESSED_METADATA_CATEGORIES_DB.load()["value"]
-categories
+categories.head()
 
 # %%
 metadata_quantile = POST_PROCESSED_METADATA_QUANTILE_DB.load()["value"]
@@ -310,6 +310,98 @@ for i, (ax, yticks) in enumerate(zip(axes, [np.arange(0.5, 4.01, 0.5), np.arange
     ax.set_ylim(ymin=yticks.min(), ymax=yticks.max())
     # ax.set_ylim(ymax=ymax)
     ax.grid()
+
+# %%
+# Compare MAGICC and CICERO-SCM temperature projections
+# First, let's check what climate models are in the database
+all_scm_temps = SCM_OUTPUT_DB.load(
+    pix.ismatch(variable="Surface Air Temperature Change"),
+    progress=True,
+)
+
+if not all_scm_temps.empty:
+    print("Climate models found:", sorted(all_scm_temps.pix.unique("climate_model")))
+    print("\nVariables matching 'Surface Air Temperature Change':")
+    print(sorted(all_scm_temps.pix.unique("variable")))
+
+    # Now load CICERO-SCM data with correct name
+    cicero_temp = all_scm_temps.loc[
+        all_scm_temps.index.get_level_values("climate_model").str.contains("CICERO", case=False)
+    ]
+
+    if not cicero_temp.empty:
+        print(f"\nFound CICERO-SCM data with {len(cicero_temp)} rows")
+        print(f"CICERO column range: {cicero_temp.columns.min()} to {cicero_temp.columns.max()}")
+
+        # Load MAGICC data from 1700 onwards (not just 2000+)
+        magicc_temp_full = temperatures_in_line_with_assessment.loc[
+            pix.isin(climate_model="MAGICCv7.6.0a3"), :
+        ].openscm.mi_loc(scratch_selection)
+        print(f"MAGICC column range: {magicc_temp_full.columns.min()} to {magicc_temp_full.columns.max()}")
+
+        magicc_temp_full = add_model_scenario_column(magicc_temp_full, ms_separator=ms_separator, ms_level=ms_level)
+
+        # Process CICERO data similarly to MAGICC - select matching columns
+        # Sort columns to ensure proper ordering
+        cicero_temp_sorted = cicero_temp.sort_index(axis=1)
+        cicero_temp_processed = add_model_scenario_column(
+            cicero_temp_sorted.openscm.mi_loc(scratch_selection),
+            ms_separator=ms_separator,
+            ms_level=ms_level,
+        )
+
+        # Find common year range for plotting
+        common_start = max(magicc_temp_full.columns.min(), cicero_temp_processed.columns.min())
+        common_end = min(magicc_temp_full.columns.max(), cicero_temp_processed.columns.max())
+        print(f"Common year range: {common_start} to {common_end}")
+
+        # Create comparison plots: MAGICC vs CICERO-SCM (stacked vertically)
+        fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(12, 8), sharex=True)
+
+        # MAGICC plot
+        magicc_temp_full.openscm.plot_plume_after_calculating_quantiles(
+            quantile_over="run_id",
+            hue_var=hue,
+            style_var="climate_model",
+            palette=palette_h,
+            quantiles_plumes=((0.5, 1.0), ((0.33, 0.67), 0.75), ((0.05, 0.95), 0.0)),
+            ax=axes[0],
+            create_legend=(lambda x, y: None),
+        )
+        axes[0].set_title("MAGICC v7.6.0a3", fontsize=12, fontweight="bold")
+        axes[0].set_xlim([1700, 2500])
+        axes[0].set_yticks(np.arange(-0.5, 4.01, 0.5))
+        axes[0].set_ylim(ymin=-0.5, ymax=6.0)
+        axes[0].set_ylabel("Temperature Change (K)", fontsize=10)
+        axes[0].grid()
+
+        # CICERO-SCM plot
+        cicero_temp_processed.openscm.plot_plume_after_calculating_quantiles(
+            quantile_over="run_id",
+            hue_var=hue,
+            style_var="climate_model",
+            palette=palette_h,
+            quantiles_plumes=((0.5, 1.0), ((0.33, 0.67), 0.75), ((0.05, 0.95), 0.0)),
+            ax=axes[1],
+            create_legend=create_legend,
+        )
+        axes[1].set_title("CICERO-SCM", fontsize=12, fontweight="bold")
+        axes[1].set_xlim([1700, 2500])
+        axes[1].set_yticks(np.arange(-0.5, 4.01, 0.5))
+        axes[1].set_ylim(ymin=-0.5, ymax=6.0)
+        axes[1].set_xlabel("Year", fontsize=10)
+        axes[1].set_ylabel("Temperature Change (K)", fontsize=10)
+        axes[1].grid()
+
+        fig.suptitle("Surface Air Temperature Change Comparison (1700-2100)", fontsize=13, fontweight="bold", y=0.995)
+        plt.tight_layout()
+    else:
+        print("\nNo CICERO-SCM temperature data found")
+else:
+    print("No 'Surface Air Temperature Change' data found in database at all")
+
+# %%
+plt.plot(cicero_temp_processed.columns)
 
 # %%
 pdf_emissions = add_model_scenario_column(

@@ -5,7 +5,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.17.1
+#       jupytext_version: 1.18.1
 #   kernelspec:
 #     display_name: default
 #     language: python
@@ -15,7 +15,7 @@
 # %% [markdown]
 # # Run a simple climate model
 #
-# Here we run a simple climate model.
+# Here we run a simple climate model...
 
 # %% [markdown]
 # ## Imports
@@ -57,8 +57,8 @@ from emissions_harmonization_historical.scm_running import (
 )
 
 # Suppress expected MAGICC warnings about extending solar forcing to 2500
-# The solar RF data is already extended to 2500, but MAGICC's Fortran code
-# warns that it's using extrapolated (not observed) data beyond 2100
+# The solar RF data is already extended to 2500. but MAGICC's Fortran code
+# warns that it's using extrapolated (not observed) data beyond 2100.
 warnings.filterwarnings("ignore", message=".*Extending solar RF.*")
 warnings.filterwarnings("ignore", message=".*magicc logged a WARNING message.*")
 warnings.filterwarnings(
@@ -478,7 +478,17 @@ elif scm.startswith("CICERO"):
                 {
                     "results_as_dict": True,
                     "carbon_cycle_outputs": True,
-                }
+                },
+                pamset_emiconc={
+                    "qbmb": 0.0,
+                    "qo3": 0.5,
+                    "qdirso2": -0.00308,
+                    "qindso2": -0.37 / 57.052577209999995,
+                    "qbc": 0.0279,
+                    "qoc": -0.00433,
+                    "qh2o_ch4": 0.091915,
+                    "ref_yr": 2010,
+                },
             )
 
             print(f"  CICERO-SCM run completed, processing {len(cscm.results)} output variables")
@@ -490,6 +500,7 @@ elif scm.startswith("CICERO"):
                 model_name=model_name,
                 climate_model=scm,
                 output_variables=output_variables,
+                start_year=1700,  # Must match nystart in CICERO-SCM parameters
             )
 
             # Save to database

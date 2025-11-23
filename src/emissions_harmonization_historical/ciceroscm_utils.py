@@ -341,12 +341,14 @@ def dataframe_to_ciceroscm_emissions(  # noqa: PLR0912, PLR0915
     return ciceroscm_df, metadata
 
 
-def ciceroscm_output_to_dataframe(
+def ciceroscm_output_to_dataframe(  # noqa: PLR0913
     cscm_results: dict,
     scenario_name: str,
     model_name: str,
+    *,
     climate_model: str = "CICEROSCM",
     output_variables: tuple[str, ...] | None = None,
+    start_year: int = 1700,
 ) -> pd.DataFrame:
     """
     Convert CICERO-SCM output dictionary to DataFrame format compatible with the database.
@@ -364,6 +366,8 @@ def ciceroscm_output_to_dataframe(
         Climate model name for metadata
     output_variables : tuple of str, optional
         Specific variables to extract. If None, extracts standard set.
+    start_year : int
+        Start year of the CICERO-SCM run (nystart parameter). Default 1700.
 
     Returns
     -------
@@ -399,9 +403,9 @@ def ciceroscm_output_to_dataframe(
 
             # Handle both numpy arrays and pandas Series
             if isinstance(values, np.ndarray):
-                # Assume years are sequential from start
-                # CICERO-SCM results are indexed by timestep, need to add start year
-                years = np.arange(len(values)) + 1750  # Default start year
+                # Assume years are sequential from start_year
+                # CICERO-SCM results are indexed by timestep starting from nystart
+                years = np.arange(len(values)) + start_year
             elif isinstance(values, pd.Series):
                 years = values.index.values
                 values = values.values

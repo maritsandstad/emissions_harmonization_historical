@@ -1,0 +1,4 @@
+# Jupytext configuration for paired notebooks in this directory
+# See https://jupytext.readthedocs.io/en/latest/formats.html
+
+formats: "ipynb,py:percent"

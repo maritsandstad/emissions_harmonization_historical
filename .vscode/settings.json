@@ -1,0 +1,22 @@
+{
+    "[python]": {
+        "editor.defaultFormatter": "charliermarsh.ruff",
+        "editor.formatOnSave": true
+    },
+    "python.defaultInterpreterPath": "${workspaceFolder}/.pixi/envs/default/bin/python",
+    "python.linting.enabled": true,
+    "python.linting.ruffPath": "${workspaceFolder}/.pixi/envs/default/bin/ruff",
+    "jupyter.notebookFileRoot": "${workspaceFolder}",
+    "jupyter.pythonPath": "${workspaceFolder}/.pixi/envs/default/bin/python",
+    "jupyter.kernels.hideWhenNoUri": false,
+    "files.associations": {
+        "*.py": "python"
+    },
+    "search.exclude": {
+        "**/.pixi": true,
+        "**/.*": true
+    },
+    "jupytext.jupytextPath": "${workspaceFolder}/.pixi/envs/default/bin/jupytext",
+    "jupytext.formats": "ipynb,py:percent",
+    "jupytext.pythonPath": "${workspaceFolder}/.pixi/envs/default/bin/python"
+}

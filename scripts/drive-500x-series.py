@@ -252,6 +252,7 @@ def main():  # noqa : PLR0912
     # Skip this step
     # notebook_prefixes = []
     scms = ["MAGICCv7.6.0a3"]
+    scms = ["CICEROSCM"]
     for iam, scm in tqdm.tqdm(itertools.product(iams, scms), desc="IAM SCM runs"):
         for notebook in all_notebooks:
             if any(notebook.name.startswith(np) for np in notebook_prefixes):
