@@ -307,6 +307,9 @@ f.run()
 nohos = [x for x in f.scenarios]
 
 # %%
+f.timepoints[275]
+
+# %%
 fig, ax = pl.subplots(1, 2, figsize=(12, 5))
 
 unc = np.tanh((co2e.sel(scenario=nohos[0]) - co2e.sel(scenario=nohos[-2])) / 1e6 / 10) * 8
@@ -339,7 +342,8 @@ for scenario in nohos:
     #     label=ldict21[scenario],
     #     color=colors[scenario],linestyle='--'
     # )
-
+ax[0].text(2030, -39, "IAM generated \nscenarios \n(2025-2100)")
+ax[0].text(2105, -39, "Priority extension\nperiod \n(2101-2150)")
 ax[0].set_ylabel("GHG emissions, GtCO$_2$eq yr$^{-1}$")
 ax[0].axhline(ls=":", color="k", lw=0.5)
 # ax[1].legend()
@@ -351,13 +355,13 @@ ax[0].set_title("(a)")
 
 for i, scenario in enumerate(nohos):
     ax[1].fill_between(
-        f.timebounds[:351],
+        f.timebounds[:],
         (
-            f.temperature.sel(scenario=scenario, layer=0)[:351]
+            f.temperature.sel(scenario=scenario, layer=0)[:]
             - f.temperature.sel(scenario=scenario, layer=0, timebounds=np.arange(1850, 1902)).mean(dim="timebounds")
         ).quantile(0.33, dim="config"),
         (
-            f.temperature.sel(scenario=scenario, layer=0)[:351]
+            f.temperature.sel(scenario=scenario, layer=0)[:]
             - f.temperature.sel(scenario=scenario, layer=0, timebounds=np.arange(1850, 1902)).mean(dim="timebounds")
         ).quantile(0.66, dim="config"),
         color=colors[scenario],
@@ -365,21 +369,21 @@ for i, scenario in enumerate(nohos):
         alpha=0.3,
         label=snames_short[i],
     )
-    ax[1].fill_between(
-        f.timebounds[350:],
-        (
-            f.temperature.sel(scenario=scenario, layer=0)[350:]
-            - f.temperature.sel(scenario=scenario, layer=0, timebounds=np.arange(1850, 1902)).mean(dim="timebounds")
-        ).quantile(0.33, dim="config"),
-        (
-            f.temperature.sel(scenario=scenario, layer=0)[350:]
-            - f.temperature.sel(scenario=scenario, layer=0, timebounds=np.arange(1850, 1902)).mean(dim="timebounds")
-        ).quantile(0.66, dim="config"),
-        color=colors[scenario],
-        hatch="XXX",
-        lw=0,
-        alpha=0.1,
-    )
+    # ax[1].fill_between(
+    #     f.timebounds[350:],
+    #     (
+    #         f.temperature.sel(scenario=scenario, layer=0)[350:]
+    #         - f.temperature.sel(scenario=scenario, layer=0, timebounds=np.arange(1850, 1902)).mean(dim="timebounds")
+    #     ).quantile(0.33, dim="config"),
+    #     (
+    #         f.temperature.sel(scenario=scenario, layer=0)[350:]
+    #         - f.temperature.sel(scenario=scenario, layer=0, timebounds=np.arange(1850, 1902)).mean(dim="timebounds")
+    #     ).quantile(0.66, dim="config"),
+    #     color=colors[scenario],
+    #     hatch="XXX",
+    #     lw=0,
+    #     alpha=0.1,
+    # )
 ax[1].fill_between(
     f.timebounds[:274],
     (
@@ -629,6 +633,211 @@ ax[7].legend()
 ax[7].grid()
 
 pl.savefig("../plots/extensions.png")
+
+# %%
+fig, ax = pl.subplots(figsize=(12, 8))
+
+# Get all forcing species for HL scenario
+forcing_species = f.forcing.specie.values
+
+# Time range filter
+time_mask = (f.timebounds >= 2020) & (f.timebounds <= 2100)  # noqa: PLR2004
+
+# Calculate median forcing for each species and filter out near-zero components
+# Threshold: max absolute forcing > 0.05 W/m2 over the time period
+threshold = 0.05
+significant_species = []
+forcing_medians = {}
+
+for specie in forcing_species:
+    forcing_data = f.forcing.sel(scenario="HL", specie=specie)
+    median_forcing = forcing_data[time_mask].median(dim="config")
+
+    if np.abs(median_forcing).max() > threshold:
+        significant_species.append(specie)
+        forcing_medians[specie] = median_forcing.values
+
+print(f"Plotting {len(significant_species)} significant forcing components (out of {len(forcing_species)} total)")
+print(f"Significant species: {significant_species}")
+
+# Separate positive and negative forcings for stacking
+time_values = f.timebounds[time_mask]
+
+# Define forcing component categories
+forcing_categories = {
+    "CO2": ["CO2"],
+    "CH4": ["CH4"],
+    "N2O": ["N2O"],
+    "Aerosols": ["Sulfur", "BC", "OC", "NH3", "NOx", "Aerosol-radiation interactions", "Aerosol-cloud interactions"],
+    "Other": [],  # Will contain everything else
+}
+
+# Categorize significant species and aggregate forcing
+categorized_forcing = {}
+for category in forcing_categories.keys():
+    categorized_forcing[category] = np.zeros(len(time_values))
+
+for specie in significant_species:
+    forcing_values = forcing_medians[specie]
+    categorized = False
+
+    for category, species_list in forcing_categories.items():
+        if category != "Other" and specie in species_list:
+            categorized_forcing[category] += forcing_values
+            categorized = True
+            break
+
+    if not categorized:
+        categorized_forcing["Other"] += forcing_values
+
+# Define colors for categories
+category_colors = {
+    "CO2": "#d62728",  # Red
+    "CH4": "#ff7f0e",  # Orange
+    "N2O": "#2ca02c",  # Green
+    "Aerosols": "#1f77b4",  # Blue
+    "Other": "#9467bd",  # Purple
+}
+
+# Create arrays to hold cumulative positive and negative forcings
+positive_cumulative = np.zeros(len(time_values))
+negative_cumulative = np.zeros(len(time_values))
+
+# Plot stacked areas by category
+for category in ["CO2", "CH4", "N2O", "Other", "Aerosols"]:
+    if category not in categorized_forcing:
+        continue
+
+    forcing_values = categorized_forcing[category]
+
+    # Skip if forcing is negligible
+    if np.abs(forcing_values).max() < 0.01:  # noqa: PLR2004
+        continue
+
+    # Split into positive and negative contributions
+    positive_part = np.maximum(forcing_values, 0)
+    negative_part = np.minimum(forcing_values, 0)
+
+    # Stack positive forcings
+    if positive_part.max() > 0:
+        ax.fill_between(
+            time_values,
+            positive_cumulative,
+            positive_cumulative + positive_part,
+            label=category if forcing_values.max() > np.abs(forcing_values.min()) else None,
+            color=category_colors.get(category, "#gray"),
+            alpha=0.8,
+            edgecolor="none",
+        )
+        positive_cumulative += positive_part
+
+    # Stack negative forcings
+    if negative_part.min() < 0:
+        ax.fill_between(
+            time_values,
+            negative_cumulative,
+            negative_cumulative + negative_part,
+            label=category if np.abs(forcing_values.min()) > forcing_values.max() else None,
+            color=category_colors.get(category, "#gray"),
+            alpha=0.8,
+            edgecolor="none",
+        )
+        negative_cumulative += negative_part
+
+# Add total forcing line
+total_forcing = f.forcing_sum.sel(scenario="HL")[time_mask].median(dim="config")
+ax.plot(time_values, total_forcing, color="black", linewidth=2.5, label="Total ERF", zorder=100)
+
+ax.axhline(0, ls=":", color="k", lw=1)
+ax.grid(True, alpha=0.3)
+ax.set_ylabel("Effective Radiative Forcing (W m$^{-2}$)", fontsize=11)
+ax.set_xlabel("Year", fontsize=11)
+ax.set_title("Forcing Components for HL Scenario (2020-2100)", fontsize=13, fontweight="bold")
+ax.legend(loc="upper left", fontsize=9, ncol=2, framealpha=0.9)
+ax.set_xlim(2020, 2100)
+
+pl.tight_layout()
+pl.savefig("../plots/forcing_components_HL_stacked_2020-2100.png", dpi=300, bbox_inches="tight")
+
+# %%
+fig, axes = pl.subplots(1, 2, figsize=(14, 6))
+
+# Time range filter
+time_mask = (f.timebounds >= 2020) & (f.timebounds <= 2100)  # noqa: PLR2004
+time_values = f.timebounds[time_mask]
+
+# CO2 forcing subplot
+co2_forcing = f.forcing.sel(scenario="HL", specie="CO2")[time_mask].median(dim="config")
+axes[0].fill_between(
+    time_values,
+    f.forcing.sel(scenario="HL", specie="CO2")[time_mask].quantile(0.05, dim="config"),
+    f.forcing.sel(scenario="HL", specie="CO2")[time_mask].quantile(0.95, dim="config"),
+    color="#d62728",
+    alpha=0.2,
+)
+axes[0].plot(time_values, co2_forcing, color="#d62728", linewidth=2.5, label="CO₂")
+axes[0].axhline(0, ls=":", color="k", lw=1)
+axes[0].grid(True, alpha=0.3)
+axes[0].set_ylabel("Effective Radiative Forcing (W m$^{-2}$)", fontsize=11)
+axes[0].set_xlabel("Year", fontsize=11)
+axes[0].set_title("CO₂ Forcing (HL Scenario)", fontsize=12, fontweight="bold")
+axes[0].set_xlim(2020, 2100)
+axes[0].legend(fontsize=10)
+
+# CH4 forcing subplot
+ch4_forcing = f.forcing.sel(scenario="HL", specie="CH4")[time_mask].median(dim="config")
+axes[1].fill_between(
+    time_values,
+    f.forcing.sel(scenario="HL", specie="CH4")[time_mask].quantile(0.05, dim="config"),
+    f.forcing.sel(scenario="HL", specie="CH4")[time_mask].quantile(0.95, dim="config"),
+    color="#ff7f0e",
+    alpha=0.2,
+)
+axes[1].plot(time_values, ch4_forcing, color="#ff7f0e", linewidth=2.5, label="CH₄")
+axes[1].axhline(0, ls=":", color="k", lw=1)
+axes[1].grid(True, alpha=0.3)
+axes[1].set_ylabel("Effective Radiative Forcing (W m$^{-2}$)", fontsize=11)
+axes[1].set_xlabel("Year", fontsize=11)
+axes[1].set_title("CH₄ Forcing (HL Scenario)", fontsize=12, fontweight="bold")
+axes[1].set_xlim(2020, 2100)
+axes[1].legend(fontsize=10)
+
+pl.tight_layout()
+pl.savefig("../plots/forcing_CO2_CH4_HL_2020-2100.png", dpi=300, bbox_inches="tight")
+
+# %%
+fig, ax = pl.subplots(figsize=(10, 6))
+
+# Time range filter
+time_mask = (f.timebounds >= 2020) & (f.timebounds <= 2100)  # noqa: PLR2004
+time_values = f.timebounds[time_mask]
+
+# Plot CH4 forcing for all scenarios
+for scenario in f.scenarios:
+    ch4_forcing = f.forcing.sel(scenario=scenario, specie="CH4")[time_mask].median(dim="config")
+
+    # Plot median
+    ax.plot(time_values, ch4_forcing, color=colors[scenario], linewidth=2, label=ldict[scenario])
+
+    # Add uncertainty bands (5th-95th percentile)
+    ax.fill_between(
+        time_values,
+        f.forcing.sel(scenario=scenario, specie="CH4")[time_mask].quantile(0.05, dim="config"),
+        f.forcing.sel(scenario=scenario, specie="CH4")[time_mask].quantile(0.95, dim="config"),
+        color=colors[scenario],
+        alpha=0.15,
+    )
+
+ax.axhline(0, ls=":", color="k", lw=1)
+ax.grid(True, alpha=0.3)
+ax.set_ylabel("Effective Radiative Forcing (W m$^{-2}$)", fontsize=11)
+ax.set_xlabel("Year", fontsize=11)
+ax.set_title("CH₄ Forcing by Scenario (2020-2100)", fontsize=13, fontweight="bold")
+ax.set_xlim(2020, 2100)
+ax.legend(fontsize=10, loc="upper left", framealpha=0.9)
+
+pl.tight_layout()
+pl.savefig("../plots/forcing_CH4_all_scenarios_2020-2100.png", dpi=300, bbox_inches="tight")
 
 # %%
 fig, ax = pl.subplots(nrows=1, ncols=2, figsize=(14, 4))
