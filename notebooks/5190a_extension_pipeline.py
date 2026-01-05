@@ -7,7 +7,7 @@
 #       format_version: '1.3'
 #       jupytext_version: 1.18.1
 #   kernelspec:
-#     display_name: Python 3 (ipykernel)
+#     display_name: default
 #     language: python
 #     name: python3
 # ---
@@ -408,7 +408,7 @@ def do_all_non_co2_extensions(scenarios_complete_global, history):  # noqa: PLR0
 # Set this to true if running for the first time to generate CSVs
 # Otherwise you can set to false to speed-up by not running throuhg
 # all the non-CO2 and afolu extensions again
-do_and_write_to_csv = False
+do_and_write_to_csv = True
 if do_and_write_to_csv:
     df_all = do_all_non_co2_extensions(scenarios_complete_global, history)
     df_all.to_csv("first_draft_extended_nonCO2_all.csv")
@@ -948,6 +948,30 @@ if test_year in co2_beccs_ext.columns:
 
 # %% [markdown]
 # # Merge dataframes into df_everything
+# print("=== MERGING ALL DATAFRAMES INTO df_everything ===")
+# df_everything = fix_up_and_concatenate_extensions(
+#     {
+#         "fossil_extension": fossil_extension_df,
+#         "afolu_extensions": df_afolu,
+#         "non_co2_extensions": df_all,
+#         "gross_positive_extensions": co2_gross_positive_ext,
+#         "cdr_extensions": global_cdr_ext,
+#         "beccs_extensions": co2_beccs_ext,
+#         "dacc_extensions": co2_dacc_ext,
+#         "ocean_extensions": co2_ocean_ext,
+#         "ew_extensions": co2_ew_ext,
+#         "biochar_extensions": co2_biochar_ext,
+#         "soil_extensions": co2_soil_ext,
+#         "other_cdr_extensions": co2_other_cdr_ext,
+#     }
+# )
+# print(df_everything.head())
+# print(f"✅ Successfully merged all DataFrames! Shape: {df_everything.shape}")
+# print(df_everything.shape)
+# print(df_all.index.names)
+
+# %%
+# Extended missing sectors for regional (non-cdr fossil)
 print("=== MERGING ALL DATAFRAMES INTO df_everything ===")
 df_everything = fix_up_and_concatenate_extensions(
     {
@@ -970,12 +994,9 @@ print(f"✅ Successfully merged all DataFrames! Shape: {df_everything.shape}")
 print(df_everything.shape)
 print(df_all.index.names)
 
-# %% [markdown]
-# # Extended missing sectors for regional (non-cdr fossil)
+# %%
 df_everything = extend_regional_for_missing(df_everything, scenarios_regional, fractions_fossil_total)
 print(df_everything.shape)
-
-# %%
 # Check for and handle duplicate metadata (CSV preparation only)
 print("=== CHECKING FOR DUPLICATES FOR CSV OUTPUT ===")
 duplicate_mask = df_everything.index.duplicated(keep=False)
