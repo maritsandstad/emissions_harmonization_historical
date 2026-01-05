@@ -534,11 +534,12 @@ def _get_historical_data_for_scenario(scenario, all_years, future_years):
     gross_pos_annual = (
         raw_output.loc[
             (
-                slice(None),
-                scenario,
-                slice(None),
-                "Emissions|CO2|Gross Positive Emissions",
-                slice(None),
+                slice(None),  # model
+                scenario,  # scenario
+                slice(None),  # region
+                slice(None),  # workflow
+                "Emissions|CO2|Gross Positive Emissions",  # variable
+                slice(None),  # unit
             ),
             all_years,
         ].sum()
@@ -554,11 +555,12 @@ def _get_historical_data_for_scenario(scenario, all_years, future_years):
     fossil_annual = (
         raw_output.loc[
             (
-                slice(None),
-                scenario,
-                slice(None),
-                "Emissions|CO2|Energy and Industrial Processes",
-                slice(None),
+                slice(None),  # model
+                scenario,  # scenario
+                slice(None),  # region
+                slice(None),  # workflow
+                "Emissions|CO2|Energy and Industrial Processes",  # variable
+                slice(None),  # unit
             ),
             all_years,
         ].T
@@ -566,7 +568,14 @@ def _get_historical_data_for_scenario(scenario, all_years, future_years):
     )
     afolu_annual = (
         raw_output.loc[
-            (slice(None), scenario, slice(None), "Emissions|CO2|AFOLU", slice(None)),
+            (
+                slice(None),  # model
+                scenario,  # scenario
+                slice(None),  # region
+                slice(None),  # workflow
+                "Emissions|CO2|AFOLU",  # variable
+                slice(None),  # unit
+            ),
             all_years,
         ].T
         / 1000
