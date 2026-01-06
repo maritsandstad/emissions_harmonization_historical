@@ -7,7 +7,7 @@
 #       format_version: '1.3'
 #       jupytext_version: 1.18.1
 #   kernelspec:
-#     display_name: Python 3 (ipykernel)
+#     display_name: default
 #     language: python
 #     name: python3
 # ---
@@ -49,7 +49,7 @@ pandas_openscm.register_pandas_accessor()
 pix.set_openscm_registry_as_default()
 
 # %% editable=true slideshow={"slide_type": ""} tags=["parameters"]
-model: str = "REMIND"
+model: str = "AIM"
 output_to_pdf: bool = False
 
 # %% [markdown]
@@ -133,19 +133,37 @@ ALL_GHGS = [
 
 
 def calculate_co2_total(indf: pd.DataFrame) -> pd.DataFrame:  # noqa: D103
-    res = (
-        indf.loc[
-            pix.isin(
-                variable=[
-                    "Emissions|CO2|Biosphere",
-                    "Emissions|CO2|Fossil",
-                ]
-            )
-        ]
-        .openscm.groupby_except("variable")
-        .sum(min_count=2)
-        .pix.assign(variable="Emissions|CO2")
-    )
+    # Select the two components
+    co2_components = indf.loc[
+        pix.isin(
+            variable=[
+                "Emissions|CO2|Biosphere",
+                "Emissions|CO2|Fossil",
+            ]
+        )
+    ].copy()
+
+    # If workflow level exists, we need to handle NaN values
+    # Reset index temporarily, do the sum, then restore
+    if "workflow" in co2_components.index.names:
+        # Save the original index for structure reference
+        index_names = co2_components.index.names
+
+        # Reset workflow to column (keeping NaN values)
+        co2_components = co2_components.reset_index("workflow")
+
+        # Group and sum (workflow column is ignored in groupby_except)
+        res = co2_components.openscm.groupby_except("variable").sum(min_count=2).pix.assign(variable="Emissions|CO2")
+
+        # Add workflow back as index level with NaN
+        res["workflow"] = np.nan
+        res = res.set_index("workflow", append=True)
+
+        # Reorder to match original
+        res = res.reorder_levels(index_names)
+    else:
+        # No workflow level, proceed normally
+        res = co2_components.openscm.groupby_except("variable").sum(min_count=2).pix.assign(variable="Emissions|CO2")
 
     return res
 
@@ -295,7 +313,9 @@ pre_processed_emms_scms_out = pix.concat(
 
 # %%
 ax = sns.lineplot(
-    data=pre_processed_emms_scms_out.loc[pix.ismatch(variable="Emissions|CO2**")].openscm.to_long_data(),
+    data=pre_processed_emms_scms_out.loc[
+        pix.ismatch(variable="Emissions|CO2**", scenario="SSP2*")
+    ].openscm.to_long_data(),
     x="time",
     y="value",
     hue="scenario",
@@ -306,7 +326,7 @@ ax.axhline(0.0, linestyle="--", color="tab:gray")
 
 # %%
 ax = sns.lineplot(
-    data=pre_processed_emms_scms_out.loc[pix.ismatch(variable="Cumulative**")].openscm.to_long_data(),
+    data=pre_processed_emms_scms_out.loc[pix.ismatch(variable="Cumulative**", scenario="SSP2*")].openscm.to_long_data(),
     x="time",
     y="value",
     hue="scenario",
@@ -317,7 +337,7 @@ ax.axhline(0.0, linestyle="--", color="tab:gray")
 
 # %%
 ax = sns.lineplot(
-    data=pre_processed_emms_scms_out.loc[pix.ismatch(variable="**GHG**")].openscm.to_long_data(),
+    data=pre_processed_emms_scms_out.loc[pix.ismatch(variable="**GHG**", scenario="SSP2*")].openscm.to_long_data(),
     x="time",
     y="value",
     hue="scenario",
@@ -361,7 +381,7 @@ harmonised_emms_scms_out = pix.concat(
 
 # %%
 ax = sns.lineplot(
-    data=harmonised_emms_scms_out.loc[pix.ismatch(variable="Cumulative**")].openscm.to_long_data(),
+    data=harmonised_emms_scms_out.loc[pix.ismatch(variable="Cumulative**", scenario="SSP2*")].openscm.to_long_data(),
     x="time",
     y="value",
     hue="scenario",
@@ -372,7 +392,7 @@ ax.axhline(0.0, linestyle="--", color="tab:gray")
 
 # %%
 ax = sns.lineplot(
-    data=harmonised_emms_scms_out.loc[pix.ismatch(variable="**GHG**")].openscm.to_long_data(),
+    data=harmonised_emms_scms_out.loc[pix.ismatch(variable="**GHG**", scenario="SSP2*")].openscm.to_long_data(),
     x="time",
     y="value",
     hue="scenario",
@@ -385,7 +405,7 @@ ax.axhline(0.0, linestyle="--", color="tab:gray")
 # ### Complete
 
 # %%
-complete_emissions = infilled_emms.loc[pix.isin(stage="complete")].reset_index("stage", drop=True)
+complete_emissions = infilled_emms.loc[pix.isin(stage="complete")].reset_index(["stage", "workflow"], drop=True)
 
 complete_emissions_annual = interpolate_to_annual(complete_emissions)
 complete_emissions_annual_gcages = update_index_levels_func(complete_emissions_annual, {"variable": to_gcages})
@@ -412,7 +432,7 @@ complete_emissions_out = pix.concat(
 
 # %%
 ax = sns.lineplot(
-    data=complete_emissions_out.loc[pix.ismatch(variable="**GHG**")].openscm.to_long_data(),
+    data=complete_emissions_out.loc[pix.ismatch(variable="**GHG**", scenario="SSP2*")].openscm.to_long_data(),
     x="time",
     y="value",
     hue="scenario",
@@ -468,7 +488,7 @@ extended_emissions_raw = infilled_emms.loc[pix.isin(stage="extended")]
 
 if not extended_emissions_raw.empty:
     print(f"Processing extended scenarios for model: {model}")
-    extended_emissions = extended_emissions_raw.reset_index("stage", drop=True)
+    extended_emissions = extended_emissions_raw.reset_index(["stage", "workflow"], drop=True)
 
     extended_emissions_annual = interpolate_to_annual(extended_emissions)
     extended_emissions_annual_gcages = update_index_levels_func(extended_emissions_annual, {"variable": to_gcages})
