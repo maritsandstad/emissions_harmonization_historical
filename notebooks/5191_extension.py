@@ -128,6 +128,58 @@ history_regional = HISTORY_HARMONISATION_DB.load()
 
 
 # %%
+scenarios_complete_global
+
+
+# %%
+
+
+def save_emissions_df(df: pd.DataFrame, filepath: str | Path) -> None:
+    """
+    Save emissions DataFrame to CSV with proper year column handling.
+
+    Ensures that numeric column names (years) are preserved correctly.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        DataFrame with emissions data. Year columns should be numeric.
+    filepath : str or Path
+        Path where CSV file should be saved.
+
+    Examples
+    --------
+    >>> save_emissions_df(scenarios_df, "data/scenarios_complete_global.csv")
+    """
+    # Ensure all numeric columns are actually float type
+    numeric_cols = [col for col in df.columns if isinstance(col, int | float)]
+
+    # Create a copy to avoid modifying original
+    df_to_save = df.copy()
+
+    # Explicitly rename to ensure they're floats
+    rename_dict = {col: float(col) for col in numeric_cols}
+    df_to_save.rename(columns=rename_dict, inplace=True)
+
+    # Save to CSV
+    df_to_save.to_csv(filepath)
+    print(f"Saved DataFrame with {len(numeric_cols)} year columns to {filepath}")
+
+
+# %%
+save_emissions_df(scenarios_complete_global, "scenarios_complete_global.csv")
+save_emissions_df(history, "history.csv")
+save_emissions_df(scenarios_regional, "scenarios_regional.csv")
+save_emissions_df(history_regional, "history_regional.csv")
+
+# %%
+scenarios_complete_global.to_csv("scenarios_complete_global.csv")
+history.to_csv("history.csv")
+scenarios_regional.to_csv("scenarios_regional.csv")
+history_regional.to_csv("history_regional.csv")
+
+
+# %%
 scenarios_regional.pix.unique("region")
 
 # %%
@@ -1128,3 +1180,10 @@ if dump_csvs:
         continuous_timeseries_concise, "continuous_emissions_timeseries_1750_2500"
     )
     result_full = save_continuous_timeseries_to_csv(df_everything, "extensions_full_emissions_timeseries_2023_2500")
+
+    # %%
+    # Execute the simple CSV save
+result = save_continuous_timeseries_to_csv(scenarios_complete_global, "scenarios_complete_global_1750_2100")
+
+# %%
+scenarios_complete_global.to_csv(EXTENSIONS_OUT_DIR / "scenarios_complete_global_before_extensions.csv")
