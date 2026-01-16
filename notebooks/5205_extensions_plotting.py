@@ -1,3 +1,15 @@
+# ---
+# jupyter:
+#   jupytext:
+#     cell_metadata_filter: -all
+#     formats: ipynb,py:percent
+#     text_representation:
+#       extension: .py
+#       format_name: percent
+#       format_version: '1.3'
+#       jupytext_version: 1.18.1
+# ---
+
 # %%
 # +
 # ruff: noqa: E402
@@ -137,9 +149,9 @@ class HistoryPlotConfig:
 # %%
 co2_gross_positive_ext = scenarios_ext_out.loc[pix.ismatch(variable="Emissions|CO2|Gross Positive Emissions")]
 print(co2_gross_positive_ext.shape)
-co2_gross_positive_ext = co2_gross_positive_ext.loc[
-    co2_gross_positive_ext.index.get_level_values("workflow") != "for_scms"
-]
+# co2_gross_positive_ext = co2_gross_positive_ext.loc[
+#     co2_gross_positive_ext.index.get_level_values("workflow") != "for_scms"
+# ]
 co2_beccs_ext = scenarios_ext_out.loc[pix.ismatch(variable="Emissions|CO2|BECCS")]
 co2_dacc_ext = scenarios_ext_out.loc[pix.ismatch(variable="Emissions|CO2|Direct Air Capture")]
 co2_ocean_ext = scenarios_ext_out.loc[pix.ismatch(variable="Emissions|CO2|Ocean")]
@@ -542,13 +554,7 @@ def _get_historical_data_for_scenario(scenario, all_years, future_years):
     # Gross positive: full historical+future
     gross_pos_annual = (
         raw_output.loc[
-            (
-                slice(None),
-                scenario,
-                slice(None),
-                "Emissions|CO2|Gross Positive Emissions",
-                slice(None),
-            ),
+            pix.ismatch(scenario=scenario, variable="Emissions|CO2|Gross Positive Emissions"),
             all_years,
         ].sum()
         / 1000
@@ -562,20 +568,14 @@ def _get_historical_data_for_scenario(scenario, all_years, future_years):
     # Fossil and AFOLU data
     fossil_annual = (
         raw_output.loc[
-            (
-                slice(None),
-                scenario,
-                slice(None),
-                "Emissions|CO2|Energy and Industrial Processes",
-                slice(None),
-            ),
+            pix.ismatch(scenario=scenario, variable="Emissions|CO2|Energy and Industrial Processes"),
             all_years,
         ].T
         / 1000
     )
     afolu_annual = (
         raw_output.loc[
-            (slice(None), scenario, slice(None), "Emissions|CO2|AFOLU", slice(None)),
+            pix.ismatch(scenario=scenario, variable="Emissions|CO2|AFOLU"),
             all_years,
         ].T
         / 1000
