@@ -99,7 +99,7 @@ TUPLE_LENGTH_WITH_STAGE = 6
 
 # %% tags=["parameters"]
 # Papermill parameters
-make_plots: bool = False
+make_plots: bool = True
 dump_csvs: bool = True
 
 # %% [markdown]
@@ -118,14 +118,19 @@ Q = UR.Quantity
 
 # %%
 scenarios_complete_global = INFILLED_SCENARIOS_DB.load(pix.isin(stage="complete")).reset_index("stage", drop=True)
+scenarios_complete_global.to_csv("scenarios_complete_global.csv")
 scenarios_complete_global  # TODO: drop 2100 end once we have usable scenario data post-2100
 history = HISTORY_HARMONISATION_DB.load(pix.ismatch(purpose="global_workflow_emissions")).reset_index(
     "purpose", drop=True
 )
+history.to_csv("history.csv")
 
 scenarios_regional = HARMONISED_SCENARIO_DB.load()
 history_regional = HISTORY_HARMONISATION_DB.load()
 
+
+scenarios_regional.to_csv("scenarios_regional.csv")
+history_regional.to_csv("history_regional.csv")
 
 # %%
 scenarios_regional.pix.unique("region")
@@ -508,7 +513,11 @@ for s, meta in scenario_model_match.items():
             or re.match(r"^\d{4}(?:\.0)?$", str(col))
         )
     ]
+    print(year_cols)
+    print(non_year_cols)
     co2_fossil = co2_fossil[non_year_cols + year_cols]
+    print(co2_fossil.shape)
+    sys.exit(4)
     # co2_afolu = df_afolu.loc[(df_afolu["model"] == meta[1]) & (df_afolu["scenario"] == meta[0])]
     co2_afolu = df_afolu.loc[pix.ismatch(model=meta[1], scenario=meta[0])]
 
