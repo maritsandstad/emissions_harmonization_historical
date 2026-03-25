@@ -255,7 +255,7 @@ def main():  # noqa: PLR0912
         # "5194",
     ]
     # Skip this step
-    notebook_prefixes = []
+    # notebook_prefixes = []
 
     for iam in tqdm.tqdm(iams, desc="IAMs up to emissions post-processing"):
         for notebook in all_notebooks:
@@ -275,7 +275,7 @@ def main():  # noqa: PLR0912
     # Run the notebook
     notebook_prefixes = ["5095"]
     # # Skip this step
-    notebook_prefixes = []
+    # notebook_prefixes = []
     for notebook in all_notebooks:
         if any(notebook.name.startswith(np) for np in notebook_prefixes):
             run_notebook(
@@ -288,7 +288,7 @@ def main():  # noqa: PLR0912
     ### Infilling if needed because we re-created the infilling database in the previous step
     notebook_prefixes = ["5190"]
     # Skip this step
-    notebook_prefixes = []
+    # notebook_prefixes = []
     for iam in iams:
         for notebook in all_notebooks:
             if any(notebook.name.startswith(np) for np in notebook_prefixes):
@@ -301,7 +301,7 @@ def main():  # noqa: PLR0912
     # Extensions
     notebook_prefixes = ["5191"]
     # Skip this step
-    notebook_prefixes = []
+    # notebook_prefixes = []
     for notebook in all_notebooks:
         if any(notebook.name.startswith(np) for np in notebook_prefixes):
             run_notebook_iam(
@@ -315,7 +315,7 @@ def main():  # noqa: PLR0912
     # so we can't use the workflow above to make this work)
     notebook_prefixes = ["5194"]
     # Skip this step
-    notebook_prefixes = []
+    # notebook_prefixes = []
     for iam in iams:
         for notebook in all_notebooks:
             if any(notebook.name.startswith(np) for np in notebook_prefixes):

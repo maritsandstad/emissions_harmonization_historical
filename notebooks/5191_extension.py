@@ -99,7 +99,7 @@ TUPLE_LENGTH_WITH_STAGE = 6
 
 # %% tags=["parameters"]
 # Papermill parameters
-make_plots: bool = False
+make_plots: bool = True
 dump_csvs: bool = True
 
 # %% [markdown]
@@ -118,13 +118,18 @@ Q = UR.Quantity
 
 # %%
 scenarios_complete_global = INFILLED_SCENARIOS_DB.load(pix.isin(stage="complete")).reset_index("stage", drop=True)
+scenarios_complete_global.to_csv("scenarios_complete_global.csv")
 scenarios_complete_global  # TODO: drop 2100 end once we have usable scenario data post-2100
 history = HISTORY_HARMONISATION_DB.load(pix.ismatch(purpose="global_workflow_emissions")).reset_index(
     "purpose", drop=True
 )
+history.to_csv("history.csv")
 
 scenarios_regional = HARMONISED_SCENARIO_DB.load()
 history_regional = HISTORY_HARMONISATION_DB.load()
+
+scenarios_regional.to_csv("scenarios_regional.csv")
+history_regional.to_csv("history_regional.csv")
 
 
 # %%
