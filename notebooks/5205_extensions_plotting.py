@@ -1,3 +1,19 @@
+# ---
+# jupyter:
+#   jupytext:
+#     cell_metadata_filter: -all
+#     formats: ipynb,py:percent
+#     text_representation:
+#       extension: .py
+#       format_name: percent
+#       format_version: '1.3'
+#       jupytext_version: 1.18.1
+#   kernelspec:
+#     display_name: default
+#     language: python
+#     name: python3
+# ---
+
 # %%
 # +
 # ruff: noqa: E402
@@ -148,6 +164,7 @@ co2_soil_carbon_ext = scenarios_ext_out.loc[pix.ismatch(variable="Emissions|CO2|
 co2_biochar_ext = scenarios_ext_out.loc[pix.ismatch(variable="Emissions|CO2|Biochar")]
 co2_other_cdr_ext = scenarios_ext_out.loc[pix.ismatch(variable="Emissions|CO2|Other CDR")]
 fossil_extension_df = scenarios_ext_out.loc[pix.ismatch(variable="Emissions|CO2|Energy and Industrial Processes")]
+afolu_extension_df = scenarios_ext_out.loc[pix.ismatch(variable="Emissions|CO2|AFOLU")]
 
 print(co2_gross_positive_ext.shape)
 print(co2_gross_positive_ext)
@@ -418,6 +435,7 @@ def _get_common_scenarios_with_history():
         & set(co2_ocean_ext.index.get_level_values("scenario"))
         & set(co2_ew_ext.index.get_level_values("scenario"))
         & set(fossil_extension_df.index.get_level_values("scenario"))
+        & set(afolu_extension_df.index.get_level_values("scenario"))
     )
     return sorted(list(scenarios))
 
@@ -498,11 +516,12 @@ def _plot_single_scenario_with_history(i, scenario, config):
 
 def _plot_annual_fluxes_with_history(ax_annual, data, years, colors):
     """Plot annual fluxes including historical data."""
-    afolu_pos = np.clip(data["afolu"].values[:, 0], 0, None)
-    afolu_neg = np.clip(data["afolu"].values[:, 0], None, 0)
+    # All data are now numpy arrays from pad_future_with_zeros
+    afolu_pos = np.clip(data["afolu"], 0, None)
+    afolu_neg = np.clip(data["afolu"], None, 0)
 
     # Stack for annual plot
-    y1_pos = data["gross_pos"].values
+    y1_pos = data["gross_pos"]
     y2_pos = afolu_pos + y1_pos
     y1_neg = data["beccs"]
     y2_neg = y1_neg + data["daccs"]
@@ -526,60 +545,30 @@ def _plot_annual_fluxes_with_history(ax_annual, data, years, colors):
     )
     ax_annual.fill_between(years, y4_neg, y5_neg, alpha=0.7, color=colors["AFOLU"])
 
-    if data["fossil"] is not None:
-        ax_annual.plot(
-            years,
-            data["fossil"] + data["afolu"].values,
-            "k-",
-            linewidth=2,
-            alpha=0.8,
-            label="Net Emissions (Total)",
-        )
+    # Plot net emissions (fossil + AFOLU)
+    ax_annual.plot(
+        years,
+        data["fossil"] + data["afolu"],
+        "k-",
+        linewidth=2,
+        alpha=0.8,
+        label="Net Emissions (Total)",
+    )
 
 
 def _get_historical_data_for_scenario(scenario, all_years, future_years):
     """Get all data for scenario including historical padding."""
-    # Gross positive: full historical+future
-    gross_pos_annual = (
-        raw_output.loc[
-            (
-                slice(None),
-                scenario,
-                slice(None),
-                "Emissions|CO2|Gross Positive Emissions",
-                slice(None),
-            ),
-            all_years,
-        ].sum()
-        / 1000
-    )
-
+    # All data comes from extension dataframes with historical padding
+    # Since these are extension-only variables (future), we need to pad with zeros for history
+    gross_pos_annual = pad_future_with_zeros(co2_gross_positive_ext, all_years, future_years, scenario) / 1000
     beccs_annual = pad_future_with_zeros(co2_beccs_ext, all_years, future_years, scenario) / 1000
     daccs_annual = pad_future_with_zeros(co2_dacc_ext, all_years, future_years, scenario) / 1000
     ocean_annual = pad_future_with_zeros(co2_ocean_ext, all_years, future_years, scenario) / 1000
     ew_annual = pad_future_with_zeros(co2_ew_ext, all_years, future_years, scenario) / 1000
 
-    # Fossil and AFOLU data
-    fossil_annual = (
-        raw_output.loc[
-            (
-                slice(None),
-                scenario,
-                slice(None),
-                "Emissions|CO2|Energy and Industrial Processes",
-                slice(None),
-            ),
-            all_years,
-        ].T
-        / 1000
-    )
-    afolu_annual = (
-        raw_output.loc[
-            (slice(None), scenario, slice(None), "Emissions|CO2|AFOLU", slice(None)),
-            all_years,
-        ].T
-        / 1000
-    )
+    # Fossil and AFOLU data from extension dataframes
+    fossil_annual = pad_future_with_zeros(fossil_extension_df, all_years, future_years, scenario) / 1000
+    afolu_annual = pad_future_with_zeros(afolu_extension_df, all_years, future_years, scenario) / 1000
 
     return {
         "gross_pos": gross_pos_annual,
@@ -593,21 +582,17 @@ def _get_historical_data_for_scenario(scenario, all_years, future_years):
 
 
 def _plot_cumulative_fluxes_with_history(ax_cumul, data, years, colors):
-    """Plot cumulative fluxes including historical data."""
-    afolu_pos = np.clip(data["afolu"].values[:, 0], 0, None)
-    afolu_neg = np.clip(data["afolu"].values[:, 0], None, 0)
+    # All data are now numpy arrays from pad_future_with_zeros
+    afolu_pos = np.clip(data["afolu"], 0, None)
+    afolu_neg = np.clip(data["afolu"], None, 0)
 
-    gross_pos_cumul = np.cumsum(data["gross_pos"].values)
+    gross_pos_cumul = np.cumsum(data["gross_pos"])
     afolu_cumul = np.cumsum(afolu_pos + afolu_neg)
     beccs_cumul = np.cumsum(data["beccs"])
     daccs_cumul = np.cumsum(data["daccs"])
     ocean_cumul = np.cumsum(data["ocean"])
     ew_cumul = np.cumsum(data["ew"])
-
-    if data["fossil"] is not None:
-        fossil_cumul = np.cumsum(data["fossil"])
-    else:
-        fossil_cumul = None
+    fossil_cumul = np.cumsum(data["fossil"])
 
     y1_pos_cumul = gross_pos_cumul
     y2_pos_cumul = afolu_cumul + y1_pos_cumul
@@ -629,9 +614,10 @@ def _plot_cumulative_fluxes_with_history(ax_cumul, data, years, colors):
         color=colors["Enhanced_Weathering"],
     )
 
+    # Plot cumulative net emissions (fossil + AFOLU)
     ax_cumul.plot(
         years,
-        fossil_cumul.values[:, 0] + afolu_cumul,
+        fossil_cumul + afolu_cumul,
         "k-",
         linewidth=2,
         alpha=0.8,
