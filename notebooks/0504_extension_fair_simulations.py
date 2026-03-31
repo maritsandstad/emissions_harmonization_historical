@@ -109,6 +109,8 @@ os.makedirs("../plots", exist_ok=True)
 df_emis = pd.read_csv("../data/fair-inputs/emissions_1750-2500.csv")
 df_emis.head()
 
+# %%
+
 # %% [markdown]
 # ## Setup and Configuration
 #
@@ -398,7 +400,7 @@ ax[1].fill_between(
     alpha=0.5,
 )
 ax[1].axhline(0, ls=":", color="k", lw=0.5)
-ax[1].set_ylabel("temperature above 1850-1900, K")
+ax[1].set_ylabel("Temperature above 1850-1900, K")
 ax[1].set_ylim(0, 5)
 ax[1].set_xlim(2000, 2150)
 
@@ -406,7 +408,8 @@ ax[1].grid()
 ax[1].legend()
 
 ax[1].set_title("(b)")
-pl.savefig("../plots/temperature_emis.png")
+pl.savefig("../plots/temperature_emis.png", dpi=600, bbox_inches="tight")
+pl.savefig("../plots/temperature_emis.pdf", format="pdf", bbox_inches="tight")
 
 # %%
 fig, ax = pl.subplots(nrows=4, ncols=2, figsize=(14, 16))
@@ -626,13 +629,14 @@ ax[7].plot(
     color="k",
 )
 ax[7].axhline(0, ls=":", color="k", lw=0.5)
-ax[7].set_ylabel("temperature above 1850-1900, K")
-ax[7].set_ylim(-3, 8)
+ax[7].set_ylabel("Temperature above 1850-1900, K")
+ax[7].set_ylim(-1, 8)
 ax[7].legend()
 
 ax[7].grid()
 
-pl.savefig("../plots/extensions.png")
+pl.savefig("../plots/extensions.png", dpi=600, bbox_inches="tight")
+pl.savefig("../plots/extensions.pdf", format="pdf", bbox_inches="tight")
 
 # %%
 fig, ax = pl.subplots(figsize=(12, 8))

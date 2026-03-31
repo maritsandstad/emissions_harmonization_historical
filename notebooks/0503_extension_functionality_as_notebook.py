@@ -1,3 +1,19 @@
+# ---
+# jupyter:
+#   jupytext:
+#     cell_metadata_filter: -all
+#     formats: ipynb,py:percent
+#     text_representation:
+#       extension: .py
+#       format_name: percent
+#       format_version: '1.3'
+#       jupytext_version: 1.19.0
+#   kernelspec:
+#     display_name: default
+#     language: python
+#     name: python3
+# ---
+
 # %% [markdown]
 # # Extensions of Marker Scenarios
 
@@ -1800,6 +1816,9 @@ fig_comprehensive = plot_comprehensive_co2_analysis()
 plt.show()
 
 # %%
+co2_beccs_ext
+
+# %%
 raw_output.pix.unique("variable").values
 
 # %%
@@ -2388,6 +2407,15 @@ def _format_axes_with_history(ax_annual, ax_cumul, scenario, i, all_years):
 # Create the comprehensive plot with history
 fig_comprehensive_history = plot_comprehensive_co2_analysis_with_history()
 plt.show()
+
+# %%
+# Save the comprehensive history figure as PDF
+output_path = "../plots/co2_comprehensive_analysis_with_history.pdf"
+fig_comprehensive_history.savefig(output_path, format="pdf", bbox_inches="tight", dpi=300)
+output_path = "../plots/co2_comprehensive_analysis_with_history.png"
+fig_comprehensive_history.savefig(output_path, format="png", dpi=600, bbox_inches="tight")
+
+print(f"Figure saved to: {output_path}")
 
 
 # %%
