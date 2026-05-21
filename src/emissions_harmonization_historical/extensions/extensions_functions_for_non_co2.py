@@ -257,8 +257,13 @@ def plot_just_global(  # noqa: PLR0913
     unextended = scenarios_regional.loc[
         pix.ismatch(scenario=f"{scen}", model=f"{model}", variable=f"{variable}", region="World")
     ]
+    print(unextended)
+    print(extended_to_plot.index)
     ax.plot(extended_to_plot.columns, extended_to_plot.values[-1, :])
     if unextended.shape[0] > 0:
         ax.plot(unextended.columns, unextended.values[-1, :], linestyle="--", alpha=0.7)
+    ax.set_title(f"{scen} - {model} - {variable}")
+    ax.set_xlabel("Year")
+    ax.set_ylabel(f"{variable} ({extended_to_plot.index.get_level_values('unit')[0]})")
     plt.savefig(f"extended_match_totals_{scen.replace(' ', '')}_{model.replace(' ', '')}_{variable.split('|')[-1]}.png")
     plt.clf()
