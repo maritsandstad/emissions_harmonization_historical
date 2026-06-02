@@ -49,6 +49,7 @@ scenarios_pre_extensions = INFILLED_SCENARIOS_DB.load()  # (pix.isin(stage="comp
 scenarios_post_extensions = INFILLED_SCENARIOS_DB.load()
 scenarios_harmonised = HARMONISED_SCENARIO_DB.load()
 scenarios_ext_out = EXTENSIONS_OUTPUT_DB.load()
+
 harmonised_history = history = HISTORY_HARMONISATION_DB.load(
     pix.ismatch(purpose="global_workflow_emissions")
 ).reset_index("purpose", drop=True)
@@ -59,7 +60,8 @@ scenarios_ext_out.columns = [
     else col
     for col in scenarios_ext_out.columns
 ]
-raw_output = merge_historical_future_timeseries(history, scenarios_ext_out)
+scenarios_ext_global = scenarios_ext_out.loc[pix.ismatch(region="World", workflow="for_scms")]
+raw_output = merge_historical_future_timeseries(history, scenarios_ext_global)
 raw_output = raw_output.loc[raw_output.index.get_level_values("workflow") == "for_scms"]
 # sys.exit(4)
 
@@ -148,7 +150,6 @@ co2_soil_carbon_ext = scenarios_ext_out.loc[pix.ismatch(variable="Emissions|CO2|
 co2_biochar_ext = scenarios_ext_out.loc[pix.ismatch(variable="Emissions|CO2|Biochar")]
 co2_other_cdr_ext = scenarios_ext_out.loc[pix.ismatch(variable="Emissions|CO2|Other CDR")]
 fossil_extension_df = scenarios_ext_out.loc[pix.ismatch(variable="Emissions|CO2|Energy and Industrial Processes")]
-
 # sys.exit(4)
 
 
@@ -401,6 +402,7 @@ def plot_comprehensive_co2_analysis_with_history():
         _plot_single_scenario_with_history(i, scenario, config)
 
     plt.tight_layout()
+    plt.savefig("comprehensive_co2_analysis_with_history.png", dpi=300, bbox_inches="tight")
     return fig
 
 
@@ -448,8 +450,8 @@ def plot_comprehensive_co2_analysis():
         & set(co2_ew_ext.index.get_level_values("scenario"))
         & set(fossil_extension_df.index.get_level_values("scenario"))
     )
-
-    scenarios = sorted(list(scenarios))
+    scenarios = _get_common_scenarios_with_history()
+    # scenarios = sorted(list(scenarios))
     n_scenarios = len(scenarios)
 
     print(f"Creating comprehensive flux analysis for {n_scenarios} scenarios across {len(year_cols)} years")
